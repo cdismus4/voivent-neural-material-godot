@@ -101,6 +101,34 @@ func _ready() -> void:
 	f_l.close()
 	all_ok = _expect_fail("non-zero level-0 reserved byte", _VnmLdr.load_package(tmp_dir)) and all_ok
 
+	# 2b. M-2: explicit "mipMax": null must be rejected per SPEC §6.2
+	var bad_null_mip := JSON.parse_string(orig_manifest_text) as Dictionary
+	bad_null_mip["mipMax"] = null
+	var f_m2 := FileAccess.open("%s/manifest.json" % tmp_dir, FileAccess.WRITE)
+	f_m2.store_string(JSON.stringify(bad_null_mip))
+	f_m2.close()
+	all_ok = _expect_fail("M-2 explicit mipMax null", _VnmLdr.load_package(tmp_dir)) and all_ok
+
+	# 2c. M-11: near-integer float like 1.000001 must be rejected strictly
+	var bad_frac_ver := JSON.parse_string(orig_manifest_text) as Dictionary
+	bad_frac_ver["version"] = 1.000001
+	var f_m11 := FileAccess.open("%s/manifest.json" % tmp_dir, FileAccess.WRITE)
+	f_m11.store_string(JSON.stringify(bad_frac_ver))
+	f_m11.close()
+	all_ok = _expect_fail("M-11 fractional version 1.000001", _VnmLdr.load_package(tmp_dir)) and all_ok
+
+	# 2d. M-4: tail subheader tailFirstMip mismatch against manifest.tailFirstMip
+	var bad_tail_mip := JSON.parse_string(orig_manifest_text) as Dictionary
+	bad_tail_mip["tailFirstMip"] = int(bad_tail_mip["tailFirstMip"]) + 1
+	var f_m4 := FileAccess.open("%s/manifest.json" % tmp_dir, FileAccess.WRITE)
+	f_m4.store_string(JSON.stringify(bad_tail_mip))
+	f_m4.close()
+	# Restore valid level-0.bin first so validation reaches tail check
+	var f_l_rest := FileAccess.open("%s/level-0.bin" % tmp_dir, FileAccess.WRITE)
+	f_l_rest.store_buffer(orig_l0)
+	f_l_rest.close()
+	all_ok = _expect_fail("M-4 tailFirstMip subheader mismatch", _VnmLdr.load_package(tmp_dir)) and all_ok
+
 	# 3. Missing file check (invalid path)
 	all_ok = _expect_fail("missing directory", _VnmLdr.load_package("/tmp/vnm_does_not_exist_12345")) and all_ok
 

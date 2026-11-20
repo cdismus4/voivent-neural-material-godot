@@ -52,25 +52,25 @@ godot --path . res://tests/test_g1_loader.tscn --rendering-driver metal --resolu
 ```
 
 ### 2. Golden Vector `SPEC §7` Two-Tier Conformance Suite (`G-4`)
-Tests all 4 profiles (`standard`, `standard8`, `quality`, `quality8` x 286 cases) across Path B float, Path B u8, Path A hardware bilinear, plus a negative control (deterministically shuffled latent bytes that must fail the gate):
+Tests all 4 profiles (`standard`, `standard8`, `quality`, `quality8` x 286 cases) across Path B float, Path B u8, Path A hardware bilinear, plus a negative control (deterministically shuffled latent bytes that must fail the gate). Set `VNM_GOLDEN_DIR` to the directory containing the golden vector JSON files (`golden_vectors*.json`):
 ```bash
-VNM_GOLDEN_DIR=../voivent-neural-material/src/__tests__/fixtures \
+VNM_GOLDEN_DIR=/path/to/vnm1-golden-vectors \
   godot --path . res://tests/test_g4_golden_harness.tscn --rendering-driver metal --resolution 128x128 --quit-after 600
 ```
 Outputs JSON report to `tests/reports/godot_g4_report.json`.
 
 ### 3. Real CC0 Demo Assets End-to-End Suite (`G-5`)
-Tests all 4 demo assets (`marble`, `fabric030`, `sand`, `cloth`) across Forward+, Mobile, and Compatibility renderers:
+Tests all 4 demo assets (`marble`, `fabric030`, `sand`, `cloth`) across Forward+, Mobile, and Compatibility renderers. Set `VNM_DEMO_ASSETS_DIR` to your directory containing the `.vnm` material folders:
 ```bash
-VNM_DEMO_ASSETS_DIR=../../satellite/worker/assets/lab/vnm/demo-assets \
+VNM_DEMO_ASSETS_DIR=/path/to/vnm-demo-assets \
   godot --path . res://tests/test_g5_demo_assets.tscn --rendering-driver metal --resolution 128x128 --quit-after 5000
 ```
 
 ## Sample Scene
 
-Open `demo/sample_scene.tscn` or run from CLI:
+Open `demo/sample_scene.tscn` or pass any `.vnm` directory or `.zip` bundle via CLI (`--vnm=...`) or `VNM_SAMPLE_PATH`:
 ```bash
-godot --path . res://demo/sample_scene.tscn -- --vnm=../../satellite/worker/assets/lab/vnm/demo-assets/marble/marble.vnm
+godot --path . res://demo/sample_scene.tscn -- --vnm=/path/to/marble.vnm
 ```
 
 ## Known Limitations (VNM1 v1)

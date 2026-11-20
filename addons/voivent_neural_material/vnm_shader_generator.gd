@@ -239,10 +239,10 @@ void fragment() {
 	if (use_normalized_mip_override) {
 		n_mip = clamp(normalized_mip_override, 0.0, 1.0);
 	} else if (enable_lod_mip) {
-		n_mip = clamp(mip_est / max(mip_max, 1.0), 0.0, 1.0);
+		n_mip = clamp(mip_est / mip_max, 0.0, 1.0);
 	}
 
-	float active_mip = use_normalized_mip_override ? (n_mip * max(mip_max, 1.0)) : mip_est;
+	float active_mip = use_normalized_mip_override ? (n_mip * mip_max) : mip_est;
 	if (enable_tail_switch && active_mip >= tail_first_mip) {
 		vec2 t_sz = vec2(textureSize(tail_tex0, 0));
 		vec2 uv_tail = vec2(

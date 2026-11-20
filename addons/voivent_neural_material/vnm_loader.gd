@@ -30,11 +30,19 @@ static func _sha256_hex(data: PackedByteArray) -> String:
 	hc.update(data)
 	return hc.finish().hex_encode().to_lower()
 
+static func _is_exact_int(v: Variant) -> bool:
+	if v is int:
+		return true
+	if v is float:
+		var f := v as float
+		return is_finite(f) and f == floor(f) and absf(f) <= 9007199254740991.0
+	return false
+
 static func _is_pos_int(v: Variant) -> bool:
-	return (v is int or (v is float and is_equal_approx(v, floor(v)))) and int(v) > 0
+	return _is_exact_int(v) and int(v) > 0
 
 static func _is_nonneg_int(v: Variant) -> bool:
-	return (v is int or (v is float and is_equal_approx(v, floor(v)))) and int(v) >= 0
+	return _is_exact_int(v) and int(v) >= 0
 
 static func _validate_dim_pair(v: Variant, label: String, out_err: Array[String]) -> Vector2i:
 	if not (v is Array) or v.size() != 2 or not _is_pos_int(v[0]) or not _is_pos_int(v[1]):
@@ -197,7 +205,7 @@ static func load_package(path: String) -> Dictionary:
 
 	var has_explicit_mip_max := false
 	var mip_max := float(maxi(1, tail_first_mip - 1))
-	if m.has("mipMax") and m["mipMax"] != null:
+	if m.has("mipMax"):
 		var mm_v: Variant = m["mipMax"]
 		if not (mm_v is int or mm_v is float) or not is_finite(float(mm_v)) or float(mm_v) <= 0.0:
 			return _err("Invalid mipMax: %s" % str(mm_v))
@@ -349,6 +357,8 @@ static func load_package(path: String) -> Dictionary:
 			return _err("tail subheader reserved byte %d is non-zero" % ri)
 	if tail_ch != 8 or tail_fmt != 1:
 		return _err("tail must have 8 channels and format=1 (u8 unorm)")
+	if tail_sub_mip != tail_first_mip:
+		return _err("tail subheader tailFirstMip mismatch: expected %d, got %d" % [tail_first_mip, tail_sub_mip])
 	if tail_w <= 0 or tail_h <= 0:
 		return _err("Invalid tail dimensions")
 	if t_payload.size() != 16 + tail_w * tail_h * 8:
