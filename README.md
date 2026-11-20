@@ -24,6 +24,8 @@ Runtime loader and GPU fragment-shader decoder addon for **Voivent Neural Materi
 1. Copy `addons/voivent_neural_material/` into your Godot 4.7+ project's `addons/` folder.
 2. Enable **Voivent Neural Material (VNM1)** under **Project -> Project Settings -> Plugins**.
 
+> **Exporting Builds (`.pck`)**: Because `VnmLoader` reads `.json` and `.bin` (or `.zip`) files directly via `FileAccess` without editor import, add `*.json, *.bin` (or `*.zip`) to **Project -> Export -> Resources -> Filters to export non-resource files/folders** if you bundle `.vnm` assets inside `res://` — or load them from `user://` / an external directory.
+
 ## Quickstart
 
 ```gdscript
