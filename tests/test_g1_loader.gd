@@ -26,17 +26,127 @@ func _expect_fail(label: String, res: Dictionary) -> bool:
 	print("[G-1 PASS-REJECT] ", label, " -> ", res.get("error", ""))
 	return true
 
+func _sha256_bytes(data: PackedByteArray) -> String:
+	var hc := HashingContext.new()
+	hc.start(HashingContext.HASH_SHA256)
+	hc.update(data)
+	return hc.finish().hex_encode().to_lower()
+
+func _make_vnm_header(chunk_kind: int, payload_len: int) -> PackedByteArray:
+	var hdr := PackedByteArray()
+	hdr.resize(16)
+	hdr.fill(0)
+	hdr.encode_u32(0, _VnmLdr.VNM_MAGIC)
+	hdr.encode_u16(4, _VnmLdr.VNM_VERSION)
+	hdr.encode_u16(6, chunk_kind)
+	hdr.encode_u32(8, payload_len)
+	hdr.encode_u32(12, 0)
+	return hdr
+
+func _create_synthetic_vnm_dir(dst_dir: String) -> void:
+	DirAccess.make_dir_recursive_absolute(dst_dir)
+	var total_weights := int(_VnmLdr.PROFILE_SPECS["standard"]["total_weights"])
+	var w_payload := PackedByteArray()
+	w_payload.resize(total_weights * 4)
+	w_payload.fill(0)
+	var w_bytes := _make_vnm_header(_VnmLdr.CHUNK_WEIGHTS, w_payload.size()) + w_payload
+
+	var fw := 8
+	var fh := 8
+	var cw := 4
+	var ch := 4
+	var l_sub := PackedByteArray()
+	l_sub.resize(16)
+	l_sub.fill(0)
+	l_sub.encode_u16(0, fw)
+	l_sub.encode_u16(2, fh)
+	l_sub.encode_u16(4, cw)
+	l_sub.encode_u16(6, ch)
+	l_sub.encode_u8(8, 1)
+	l_sub.encode_u8(9, 1)
+	var l_data := PackedByteArray()
+	l_data.resize((fw * fh + cw * ch) * 4)
+	l_data.fill(128)
+	var l_payload := l_sub + l_data
+	var l_bytes := _make_vnm_header(_VnmLdr.CHUNK_LATENTS, l_payload.size()) + l_payload
+
+	var tw := 4
+	var th := 4
+	var t_sub := PackedByteArray()
+	t_sub.resize(16)
+	t_sub.fill(0)
+	t_sub.encode_u16(0, tw)
+	t_sub.encode_u16(2, th)
+	t_sub.encode_u8(4, 5)
+	t_sub.encode_u8(5, 8)
+	t_sub.encode_u8(6, 1)
+	var t_data := PackedByteArray()
+	t_data.resize(tw * th * 8)
+	t_data.fill(128)
+	var t_payload := t_sub + t_data
+	var t_bytes := _make_vnm_header(_VnmLdr.CHUNK_TAIL, t_payload.size()) + t_payload
+
+	var manifest := {
+		"format": "VNM1",
+		"version": 1,
+		"assetId": "vnm1-standalone-synthetic-test",
+		"sourceSize": [64, 64],
+		"profile": "standard",
+		"quantization": "u8",
+		"weightStoragePrecision": "f32",
+		"computePrecision": "f32",
+		"channels": "base3-normal2-rough-metal-ao",
+		"baseColorSpace": "linear-srgb",
+		"normalConvention": "tangent-positive-y-positive-z",
+		"wrapU": "repeat",
+		"wrapV": "repeat",
+		"weights": {"url": "weights.bin", "sha256": _sha256_bytes(w_bytes), "byteLength": w_bytes.size()},
+		"levels": [
+			{
+				"sourceMip": 0,
+				"sourceSize": [64, 64],
+				"fineSize": [fw, fh],
+				"coarseSize": [cw, ch],
+				"chunk": {"url": "level-0.bin", "sha256": _sha256_bytes(l_bytes), "byteLength": l_bytes.size()},
+			}
+		],
+		"tailFirstMip": 5,
+		"tail": {"url": "tail.bin", "sha256": _sha256_bytes(t_bytes), "byteLength": t_bytes.size()},
+	}
+	var files := {
+		"manifest.json": JSON.stringify(manifest).to_utf8_buffer(),
+		"weights.bin": w_bytes,
+		"level-0.bin": l_bytes,
+		"tail.bin": t_bytes,
+	}
+	for fn in files.keys():
+		var fa := FileAccess.open("%s/%s" % [dst_dir, fn], FileAccess.WRITE)
+		fa.store_buffer(files[fn])
+		fa.close()
+
 func _ready() -> void:
 	var assets_root := OS.get_environment("VNM_DEMO_ASSETS_DIR")
 	if assets_root.is_empty():
-		assets_root = ProjectSettings.globalize_path("res://../../satellite/worker/assets/lab/vnm/demo-assets")
+		var local_assets := ProjectSettings.globalize_path("res://demo-assets")
+		if DirAccess.dir_exists_absolute(local_assets):
+			assets_root = local_assets
 
-	var demo_paths := [
-		"%s/marble/marble.vnm" % assets_root,
-		"%s/fabric030/ambientcg-fabric030-1k.vnm" % assets_root,
-		"%s/sand/sand.vnm" % assets_root,
-		"%s/cloth/cloth.vnm" % assets_root,
-	]
+	var synth_dir := "/tmp/vnm_g1_synthetic_fixture"
+	var use_real_demos := not assets_root.is_empty() and DirAccess.dir_exists_absolute(assets_root)
+	var sample_dir := ""
+	var demo_paths: Array[String] = []
+	if use_real_demos:
+		demo_paths = [
+			"%s/marble/marble.vnm" % assets_root,
+			"%s/fabric030/ambientcg-fabric030-1k.vnm" % assets_root,
+			"%s/sand/sand.vnm" % assets_root,
+			"%s/cloth/cloth.vnm" % assets_root,
+		]
+		sample_dir = demo_paths[0]
+	else:
+		_create_synthetic_vnm_dir(synth_dir)
+		demo_paths = [synth_dir]
+		sample_dir = synth_dir
 
 	var all_ok := true
 	for p in demo_paths:
@@ -48,13 +158,13 @@ func _ready() -> void:
 			var pkg: _VnmPkg = res["package"]
 			print("[G-1 PASS-LOAD] ", pkg.asset_id, " profile=", pkg.profile, " source=", pkg.source_size, " fine=", pkg.fine_size, " tail=", pkg.tail_size)
 
-	# Test single-file ZIP reading (marble)
+	# Test single-file ZIP reading
 	var zip_path := "/tmp/vnm_test_marble.zip"
 	var zp := ZIPPacker.new()
 	if zp.open(zip_path) == OK:
 		for fn in ["manifest.json", "weights.bin", "level-0.bin", "tail.bin"]:
-			zp.start_file("marble.vnm/%s" % fn)
-			zp.write_file(FileAccess.get_file_as_bytes("%s/marble/marble.vnm/%s" % [assets_root, fn]))
+			zp.start_file("sample.vnm/%s" % fn)
+			zp.write_file(FileAccess.get_file_as_bytes("%s/%s" % [sample_dir, fn]))
 			zp.close_file()
 		zp.close()
 		var zip_res := _VnmLdr.load_package(zip_path)
@@ -67,9 +177,9 @@ func _ready() -> void:
 		print("[G-1 FAIL] Could not pack temporary zip")
 		all_ok = false
 
-	# Negative validation tests using mutated temporary copy of marble
+	# Negative validation tests using mutated temporary copy
 	var tmp_dir := "/tmp/vnm_test_invalid_case"
-	_copy_dir("%s/marble/marble.vnm" % assets_root, tmp_dir)
+	_copy_dir(sample_dir, tmp_dir)
 
 	# 1. Unknown profile
 	var orig_manifest_text := FileAccess.get_file_as_string("%s/manifest.json" % tmp_dir)
@@ -136,6 +246,10 @@ func _ready() -> void:
 	for fn in ["manifest.json", "weights.bin", "level-0.bin", "tail.bin"]:
 		DirAccess.remove_absolute("%s/%s" % [tmp_dir, fn])
 	DirAccess.remove_absolute(tmp_dir)
+	if not use_real_demos and DirAccess.dir_exists_absolute(synth_dir):
+		for fn in ["manifest.json", "weights.bin", "level-0.bin", "tail.bin"]:
+			DirAccess.remove_absolute("%s/%s" % [synth_dir, fn])
+		DirAccess.remove_absolute(synth_dir)
 	DirAccess.remove_absolute(zip_path)
 
 	print("[G-1 SUMMARY] all_ok=", all_ok)

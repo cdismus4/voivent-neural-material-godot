@@ -219,7 +219,13 @@ func _spot_render_lit_scene(mat: Material, frames: int) -> Dictionary:
 func _ready() -> void:
 	var assets_root := OS.get_environment("VNM_DEMO_ASSETS_DIR")
 	if assets_root.is_empty():
-		assets_root = ProjectSettings.globalize_path("res://../../satellite/worker/assets/lab/vnm/demo-assets")
+		var local_assets := ProjectSettings.globalize_path("res://demo-assets")
+		if DirAccess.dir_exists_absolute(local_assets):
+			assets_root = local_assets
+	if assets_root.is_empty() or not DirAccess.dir_exists_absolute(assets_root):
+		push_error("[G-5 ERROR] Demo assets directory not found. Set VNM_DEMO_ASSETS_DIR=/path/to/vnm-demo-assets or place assets in res://demo-assets.")
+		get_tree().quit(1)
+		return
 
 	var renderer_driver := OS.get_cmdline_args()
 	var is_compat := RenderingServer.get_current_rendering_method() == "gl_compatibility"
