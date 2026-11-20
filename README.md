@@ -2,6 +2,12 @@
 
 Runtime loader and GPU fragment-shader decoder addon for **Voivent Neural Material (VNM1)** PBR materials in Godot `4.7.2` (4.7 series) across **Forward+**, **Mobile**, and **Compatibility** renderers.
 
+- **Live WebGPU Demo**: **[https://daw.voivent.com/lab/vnm/](https://daw.voivent.com/lab/vnm/)**
+- **TypeScript / WebGPU Runtime & SPEC**: [`cdismus4/voivent-neural-material`](https://github.com/cdismus4/voivent-neural-material)
+
+![Godot 4.7 Forward+ Preview — Marble 01 (standard) and Coast Sand 03 (quality8)](./docs/preview-godot.png)
+*Rendered directly in Godot `4.7.2-stable` (Forward+): Left = `Marble 01` (`standard` 4ch, `1.26 MB`), Right = `Coast Sand 03` (`quality8` 8ch, `10.01 MB`). Source textures: Poly Haven (CC0-1.0).*
+
 ## Features
 
 - **Zero GDExtension required**: Pure GDScript + Godot spatial shading language (`addons/voivent_neural_material/`).
