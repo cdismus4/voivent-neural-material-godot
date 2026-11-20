@@ -73,6 +73,11 @@ Open `demo/sample_scene.tscn` or run from CLI:
 godot --path . res://demo/sample_scene.tscn -- --vnm=../../satellite/worker/assets/lab/vnm/demo-assets/marble/marble.vnm
 ```
 
+## Known Limitations (VNM1 v1)
+
+- **No intermediate mipmaps in v1**: VNM1 v1 assets encode mip 0 (`level-0.bin`) plus a `16x16` `tail.bin` without intermediate mip levels (mip 1..6). High-frequency woven/periodic surfaces (e.g. denim or fine fabric) will exhibit minification moire at steep distances compared to mipmapped PBR textures.
+- **Channel scope**: 8 PBR channels (`baseColor` RGB, tangent `normal` XY with `+Y` up, `roughness`, `metalness`, `ao`); alpha cutout, emissive, and height maps are outside v1.
+
 ## License
 
 Licensed under the [Apache License, Version 2.0](./LICENSE).
