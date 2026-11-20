@@ -1,0 +1,275 @@
+{
+  "adapter": "Apple M4",
+  "assets": [
+    {
+      "asset_id": "vnm1-p1-marble",
+      "asset_label": "marble",
+      "coarse_size": [
+        256,
+        256
+      ],
+      "fine_size": [
+        512,
+        512
+      ],
+      "profile": "standard",
+      "timings": [
+        {
+          "baseline_frame_ms_median": 8.562,
+          "baseline_gpu_ms_median": 0.444999992847443,
+          "center_pixel_ok": true,
+          "compile_ms": 820.596,
+          "coverage_pct": 25,
+          "cpu_ms_median": 0.11599999666214,
+          "delta_frame_ms_median": -0.0229999999999997,
+          "delta_gpu_ms_median": 1.19199997186661,
+          "frame_ms_median": 8.539,
+          "frame_ms_p95": 8.779,
+          "gpu_ms_median": 1.63699996471405,
+          "gpu_ms_p95": 1.77400004863739
+        },
+        {
+          "baseline_frame_ms_median": 8.524,
+          "baseline_gpu_ms_median": 0.453999996185303,
+          "center_pixel_ok": true,
+          "compile_ms": 5.062,
+          "coverage_pct": 50,
+          "cpu_ms_median": 0.12899999320507,
+          "delta_frame_ms_median": 0.0530000000000008,
+          "delta_gpu_ms_median": 2.41100001335144,
+          "frame_ms_median": 8.577,
+          "frame_ms_p95": 9.057,
+          "gpu_ms_median": 2.86500000953674,
+          "gpu_ms_p95": 3.11199998855591
+        },
+        {
+          "baseline_frame_ms_median": 8.555,
+          "baseline_gpu_ms_median": 0.51800000667572,
+          "center_pixel_ok": true,
+          "compile_ms": 4.443,
+          "coverage_pct": 100,
+          "cpu_ms_median": 0.123000003397465,
+          "delta_frame_ms_median": -0.0280000000000005,
+          "delta_gpu_ms_median": 4.58199989795685,
+          "frame_ms_median": 8.527,
+          "frame_ms_p95": 8.916,
+          "gpu_ms_median": 5.09999990463257,
+          "gpu_ms_p95": 5.42600011825562
+        }
+      ]
+    },
+    {
+      "asset_id": "vnm1-stage2q-cloth",
+      "asset_label": "cloth",
+      "coarse_size": [
+        512,
+        512
+      ],
+      "fine_size": [
+        1024,
+        1024
+      ],
+      "profile": "quality",
+      "timings": [
+        {
+          "baseline_frame_ms_median": 8.562,
+          "baseline_gpu_ms_median": 0.444999992847443,
+          "center_pixel_ok": true,
+          "compile_ms": 522.591,
+          "coverage_pct": 25,
+          "cpu_ms_median": 0.119999997317791,
+          "delta_frame_ms_median": -0.0299999999999994,
+          "delta_gpu_ms_median": 3.27599996328354,
+          "frame_ms_median": 8.532,
+          "frame_ms_p95": 8.947,
+          "gpu_ms_median": 3.72099995613098,
+          "gpu_ms_p95": 4.57600021362305
+        },
+        {
+          "baseline_frame_ms_median": 8.524,
+          "baseline_gpu_ms_median": 0.453999996185303,
+          "center_pixel_ok": true,
+          "compile_ms": 3.408,
+          "coverage_pct": 50,
+          "cpu_ms_median": 0.12899999320507,
+          "delta_frame_ms_median": -0.0219999999999985,
+          "delta_gpu_ms_median": 6.23799991607666,
+          "frame_ms_median": 8.502,
+          "frame_ms_p95": 8.801,
+          "gpu_ms_median": 6.69199991226196,
+          "gpu_ms_p95": 7.07999992370605
+        },
+        {
+          "baseline_frame_ms_median": 8.555,
+          "baseline_gpu_ms_median": 0.51800000667572,
+          "center_pixel_ok": true,
+          "compile_ms": 4.637,
+          "coverage_pct": 100,
+          "cpu_ms_median": 0.0920000001788139,
+          "delta_frame_ms_median": -0.199,
+          "delta_gpu_ms_median": 5.70400011539459,
+          "frame_ms_median": 8.356,
+          "frame_ms_p95": 8.602,
+          "gpu_ms_median": 6.22200012207031,
+          "gpu_ms_p95": 7.28000020980835
+        }
+      ]
+    },
+    {
+      "asset_id": "vnm1-p1-ambientcg-fabric030-1k",
+      "asset_label": "fabric030",
+      "coarse_size": [
+        256,
+        256
+      ],
+      "fine_size": [
+        512,
+        512
+      ],
+      "profile": "standard8",
+      "timings": [
+        {
+          "baseline_frame_ms_median": 8.562,
+          "baseline_gpu_ms_median": 0.444999992847443,
+          "center_pixel_ok": true,
+          "compile_ms": 632.842,
+          "coverage_pct": 25,
+          "cpu_ms_median": 0.0979999974370003,
+          "delta_frame_ms_median": -0.157999999999999,
+          "delta_gpu_ms_median": 1.33400005102158,
+          "frame_ms_median": 8.404,
+          "frame_ms_p95": 8.827,
+          "gpu_ms_median": 1.77900004386902,
+          "gpu_ms_p95": 1.89900004863739
+        },
+        {
+          "baseline_frame_ms_median": 8.524,
+          "baseline_gpu_ms_median": 0.453999996185303,
+          "center_pixel_ok": true,
+          "compile_ms": 4.981,
+          "coverage_pct": 50,
+          "cpu_ms_median": 0.101000003516674,
+          "delta_frame_ms_median": -0.0859999999999985,
+          "delta_gpu_ms_median": 2.74699997901917,
+          "frame_ms_median": 8.438,
+          "frame_ms_p95": 8.966,
+          "gpu_ms_median": 3.20099997520447,
+          "gpu_ms_p95": 3.34400010108948
+        },
+        {
+          "baseline_frame_ms_median": 8.555,
+          "baseline_gpu_ms_median": 0.51800000667572,
+          "center_pixel_ok": true,
+          "compile_ms": 3.498,
+          "coverage_pct": 100,
+          "cpu_ms_median": 0.135000005364418,
+          "delta_frame_ms_median": -0.0649999999999995,
+          "delta_gpu_ms_median": 5.13399994373322,
+          "frame_ms_median": 8.49,
+          "frame_ms_p95": 8.788,
+          "gpu_ms_median": 5.65199995040894,
+          "gpu_ms_p95": 5.85400009155273
+        }
+      ]
+    },
+    {
+      "asset_id": "vnm1-p1-sand",
+      "asset_label": "sand",
+      "coarse_size": [
+        512,
+        512
+      ],
+      "fine_size": [
+        1024,
+        1024
+      ],
+      "profile": "quality8",
+      "timings": [
+        {
+          "baseline_frame_ms_median": 8.562,
+          "baseline_gpu_ms_median": 0.444999992847443,
+          "center_pixel_ok": true,
+          "compile_ms": 665.563,
+          "coverage_pct": 25,
+          "cpu_ms_median": 0.123999997973442,
+          "delta_frame_ms_median": -0.00899999999999856,
+          "delta_gpu_ms_median": 2.81499999761581,
+          "frame_ms_median": 8.553,
+          "frame_ms_p95": 8.888,
+          "gpu_ms_median": 3.25999999046326,
+          "gpu_ms_p95": 4.14300012588501
+        },
+        {
+          "baseline_frame_ms_median": 8.524,
+          "baseline_gpu_ms_median": 0.453999996185303,
+          "center_pixel_ok": true,
+          "compile_ms": 4.462,
+          "coverage_pct": 50,
+          "cpu_ms_median": 0.130999997258186,
+          "delta_frame_ms_median": -0.0299999999999994,
+          "delta_gpu_ms_median": 5.36199998855591,
+          "frame_ms_median": 8.494,
+          "frame_ms_p95": 8.845,
+          "gpu_ms_median": 5.81599998474121,
+          "gpu_ms_p95": 6.54400014877319
+        },
+        {
+          "baseline_frame_ms_median": 8.555,
+          "baseline_gpu_ms_median": 0.51800000667572,
+          "center_pixel_ok": true,
+          "compile_ms": 6.298,
+          "coverage_pct": 100,
+          "cpu_ms_median": 0.096000000834465,
+          "delta_frame_ms_median": -0.157999999999999,
+          "delta_gpu_ms_median": 6.22400009632111,
+          "frame_ms_median": 8.397,
+          "frame_ms_p95": 8.631,
+          "gpu_ms_median": 6.74200010299683,
+          "gpu_ms_p95": 7.04300022125244
+        }
+      ]
+    }
+  ],
+  "baseline": {
+    "25": {
+      "center_pixel_ok": true,
+      "compile_ms": 4.593,
+      "coverage_pct": 25,
+      "cpu_ms_median": 0.125,
+      "frame_ms_median": 8.562,
+      "frame_ms_p95": 8.89,
+      "gpu_ms_median": 0.444999992847443,
+      "gpu_ms_p95": 0.575999975204468
+    },
+    "50": {
+      "center_pixel_ok": true,
+      "compile_ms": 2.29,
+      "coverage_pct": 50,
+      "cpu_ms_median": 0.126000002026558,
+      "frame_ms_median": 8.524,
+      "frame_ms_p95": 8.956,
+      "gpu_ms_median": 0.453999996185303,
+      "gpu_ms_p95": 0.592999994754791
+    },
+    "100": {
+      "center_pixel_ok": true,
+      "compile_ms": 4.757,
+      "coverage_pct": 100,
+      "cpu_ms_median": 0.123999997973442,
+      "frame_ms_median": 8.555,
+      "frame_ms_p95": 9.013,
+      "gpu_ms_median": 0.51800000667572,
+      "gpu_ms_p95": 0.601999998092651
+    }
+  },
+  "godot_version": "4.7.2-stable (official)",
+  "measured_frames": 300,
+  "rendering_method": "mobile",
+  "resolution": [
+    1280,
+    720
+  ],
+  "suite": "VNM1-Godot-P2-Aligned-Cost",
+  "vsync_mode": 0,
+  "warmup_frames": 60
+}

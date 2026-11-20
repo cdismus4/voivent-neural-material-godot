@@ -2,4 +2,6 @@
 *.tmp
 *.log
 tests/reports/*.json
+!tests/reports/godot_p2_cost_forward_plus.json
+!tests/reports/godot_p2_cost_mobile.json
 .DS_Store
