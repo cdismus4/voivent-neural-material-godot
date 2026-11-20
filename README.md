@@ -66,6 +66,14 @@ VNM_DEMO_ASSETS_DIR=/path/to/vnm-demo-assets \
   godot --path . res://tests/test_g5_demo_assets.tscn --rendering-driver metal --resolution 128x128 --quit-after 5000
 ```
 
+### 4. P2-Aligned GPU / Frame Cost Benchmark
+Measures `gpu_ms` and frame delta against a 3-texture `1024x1024` `StandardMaterial3D` PBR baseline at `1280x720` (`60` warmup + `300` measured frames, `25%` / `50%` / `100%` screen coverage). Use `--rendering-driver vulkan` so `RenderingServer.viewport_get_measured_render_time_gpu()` records hardware GPU timestamps:
+```bash
+VNM_DEMO_ASSETS_DIR=/path/to/vnm-demo-assets \
+  godot --path . res://tests/test_p2_cost_benchmark.tscn --rendering-driver vulkan --rendering-method forward_plus --resolution 1280x720 --disable-vsync --max-fps 0
+```
+Outputs JSON report to `tests/reports/godot_p2_cost_<rendering_method>.json`.
+
 ## Sample Scene
 
 Open `demo/sample_scene.tscn` or pass any `.vnm` directory or `.zip` bundle via CLI (`--vnm=...`) or `VNM_SAMPLE_PATH`:
