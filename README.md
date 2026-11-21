@@ -9,7 +9,7 @@ Runtime loader and GPU fragment-shader decoder addon for **Voivent Neural Materi
 *Rendered directly in Godot `4.7.2-stable` (Forward+): Left = `Marble 01` (`standard` 4ch, `1.26 MB`), Right = `Coast Sand 03` (`quality8` 8ch, `10.01 MB`). Source textures: Poly Haven (CC0-1.0).*
 
 ![Playable 3D Scene Comparison — Original Reference PNG PBR vs VNM1 Direct GPU Shader](./docs/preview-godot-comparison.jpg)
-*Playable 3D mini-game split comparison (`1440×900`, Apple M4, Godot `4.7.2-stable` Metal 4.0 Forward+): Left = Original Reference PNG PBR (`78.89 MB`, `60 FPS`), Right = VNM1 Direct GPU Shader (`18.79 MB / 23.8%`, `60 FPS`) with latent mipmap LOD, smooth tail crossfade, and Burley diffuse. Materials: Poly Haven (`marble_01`, `coast_sand_03`) & ambientCG (`Fabric030`) (CC0-1.0). Note: the `5587ms` PNG startup load on the HUD reflects runtime `Image.load_from_file()` + GDScript pixel-by-pixel sRGB-to-linear LUT conversion for comparison, not editor-imported `.ctex` textures.*
+*Playable 3D mini-game split comparison (`1440×900`, Apple M4, Godot `4.7.2-stable` Metal 4.0 Forward+): Left = Original Reference PNG PBR (`78.89 MB`, `60 FPS`), Right = VNM1 Direct GPU Shader (`18.79 MB / 23.8%`, `60 FPS`) with latent mipmap LOD, anisotropic filtering, local phase damping, smooth tail crossfade, and Burley diffuse. Materials: Poly Haven (`marble_01`, `coast_sand_03`) & ambientCG (`Fabric030`) (CC0-1.0). Note: the `5651ms` PNG startup load on the HUD reflects runtime `Image.load_from_file()` + GDScript pixel-by-pixel sRGB-to-linear LUT conversion for comparison, not editor-imported `.ctex` textures.*
 
 ## Features
 
