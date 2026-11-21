@@ -240,7 +240,7 @@ void fragment() {
 	vec4 uvd = texelFetch(uvs_tex, ivec2(clamp(int(floor(UV.x * float(%d))), 0, %d), 0), 0);
 	float y[8];
 	float active_mip = normalized_mip_override * mip_max;
-	eval_vnm1_raw(uvd.xy, normalized_mip_override, wrap_u_repeat, wrap_v_repeat, y, active_mip);
+	eval_vnm1_raw(uvd.xy, normalized_mip_override, wrap_u_repeat, wrap_v_repeat, y, active_mip, vec2(0.0), vec2(0.0), false);
 	ALBEDO = vec3(clamp(y[0], 0.0, 1.0), clamp(y[1], 0.0, 1.0), clamp(y[2], 0.0, 1.0));
 }
 """ % [test_uvs.size(), test_uvs.size() - 1]

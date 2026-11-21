@@ -100,7 +100,7 @@ godot --path . res://demo/sample_scene.tscn -- --vnm=/path/to/marble.vnm
 ## Known Limitations & Color Space (VNM1 v1)
 
 - **Linear BaseColor output**: Per `SPEC §3`/`§6.4`, decoded `ALBEDO` is in **linear-sRGB** space (`baseColorSpace: "linear-srgb"`). Normal Godot-imported `StandardMaterial3D` albedo textures are also converted from sRGB to linear automatically; if you load reference PNGs manually at runtime via `Image.load_from_file()`, convert the basecolor map with `srgb_to_linear` before comparing brightness against VNM1.
-- **No neural intermediate mipmaps in v1**: VNM1 v1 assets store mip 0 (`level-0.bin`) and a `16x16` `tail.bin`. `HARDWARE_BILINEAR` mitigates far-distance minification aliasing via latent mipmap prefiltering (`enable_latent_lod`) and smooth tail crossfading (`enable_tail_crossfade`, default mips `3.0..5.0`), both toggleable per `VnmMaterial`.
+- **No neural intermediate mipmaps in v1**: VNM1 v1 assets store mip 0 (`level-0.bin`) and a `16x16` `tail.bin`. `HARDWARE_BILINEAR` mitigates far-distance minification aliasing via anisotropic latent prefiltering (`textureGrad` gated at `active_mip >= 4.0`), anisotropy-capped tail crossfading (`cap = 4.0`, default mips `3.0..5.0`), and fine-grid local phase damping (`r_damp = exp2(-max(lod_f, 0.0))`). Residual moiré can still appear on high-frequency woven materials (e.g., `fabric030`, `cloth`) at oblique angles in the low-mip region (`lod_f <= 0`, before `r_damp` engages) — tracked as a known v1 limitation.
 - **Channel scope**: 8 PBR channels (`baseColor` RGB, tangent `normal` XY with `+Y` up, `roughness`, `metalness`, `ao`); alpha cutout, emissive, and height maps are outside v1.
 
 ## License

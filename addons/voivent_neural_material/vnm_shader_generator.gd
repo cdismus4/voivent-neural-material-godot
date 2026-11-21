@@ -39,7 +39,7 @@ static func _build_common_core(profile: String, path: SamplingPath, wrap_u: Stri
 	var w3_start := b2_start + h2_v4
 	var b3_start := w3_start + out_dim * h2_v4
 
-	var tex_hint := "filter_nearest, repeat_disable" if path == SamplingPath.EXACT_BILINEAR else ("filter_linear_mipmap, %s" % _wrap_hint(wrap_u, wrap_v))
+	var tex_hint := "filter_nearest, repeat_disable" if path == SamplingPath.EXACT_BILINEAR else ("filter_linear_mipmap_anisotropic, %s" % _wrap_hint(wrap_u, wrap_v))
 
 	var weight_uniform := ("uniform vec4 weights[%d];\n" % vec4_count) if use_uniform_weights else "uniform sampler2D weights_tex : filter_nearest, repeat_disable;\n"
 	var uniforms := """
@@ -115,12 +115,15 @@ vec4 sample_exact(sampler2D t, vec2 uv_eff, ivec2 sz, bool rep_u, bool rep_v) {
 	return mix(mix(f00, f10, fx), mix(f01, f11, fx), fy);
 }
 
-vec4 sample_hw(sampler2D t, vec2 raw_uv, ivec2 sz, bool rep_u, bool rep_v, float lod) {
+vec4 sample_hw(sampler2D t, vec2 raw_uv, ivec2 sz, bool rep_u, bool rep_v, float lod, vec2 g_x, vec2 g_y, bool use_grad) {
 	float lod_scale = exp2(max(lod, 0.0));
 	float mu = min(0.5 * lod_scale / max(float(sz.x), 1.0), 0.5);
 	float mv = min(0.5 * lod_scale / max(float(sz.y), 1.0), 0.5);
 	float hu = rep_u ? raw_uv.x : clamp(raw_uv.x, mu, 1.0 - mu);
 	float hv = rep_v ? raw_uv.y : clamp(raw_uv.y, mv, 1.0 - mv);
+	if (use_grad) {
+		return textureGrad(t, vec2(hu, hv), g_x, g_y) * 2.0 - 1.0;
+	}
 	return textureLod(t, vec2(hu, hv), lod) * 2.0 - 1.0;
 }
 
@@ -139,7 +142,7 @@ vec3 reconstruct_normal(float raw_nx, float raw_ny) {
 """
 
 	var eval_fn := """
-void eval_vnm1_raw(vec2 in_uv, float norm_mip, bool rep_u, bool rep_v, out float raw_out[8], float lat_mip) {
+void eval_vnm1_raw(vec2 in_uv, float norm_mip, bool rep_u, bool rep_v, out float raw_out[8], float lat_mip, vec2 g_uv_x, vec2 g_uv_y, bool use_grad) {
 	float u_eff = rep_u ? fract(in_uv.x) : clamp(in_uv.x, 0.0, 1.0);
 	float v_eff = rep_v ? fract(in_uv.y) : clamp(in_uv.y, 0.0, 1.0);
 	vec2 uv_eff = vec2(u_eff, v_eff);
@@ -170,16 +173,18 @@ void eval_vnm1_raw(vec2 in_uv, float norm_mip, bool rep_u, bool rep_v, out float
 		eval_fn += "	float ratio_c = max(source_size.x / max(float(coarse_size.x), 1.0), source_size.y / max(float(coarse_size.y), 1.0));\n"
 		eval_fn += "	float lod_f = clamp(eff_lat - log2(max(ratio_f, 1.0)), 0.0, 10.0);\n"
 		eval_fn += "	float lod_c = clamp(eff_lat - log2(max(ratio_c, 1.0)), 0.0, 10.0);\n"
-		eval_fn += "	x_v[0] = sample_hw(fine_tex0, in_uv, fine_size, rep_u, rep_v, lod_f);\n"
+		eval_fn += "	float r_damp = exp2(-1.0 * max(lod_f, 0.0));\n"
+		eval_fn += "	vec2 r_in = r * r_damp;\n"
+		eval_fn += "	x_v[0] = sample_hw(fine_tex0, in_uv, fine_size, rep_u, rep_v, lod_f, g_uv_x, g_uv_y, use_grad);\n"
 		if ch == 8:
-			eval_fn += """	x_v[1] = sample_hw(fine_tex1, in_uv, fine_size, rep_u, rep_v, lod_f);
-	x_v[2] = sample_hw(coarse_tex0, in_uv, coarse_size, rep_u, rep_v, lod_c);
-	x_v[3] = sample_hw(coarse_tex1, in_uv, coarse_size, rep_u, rep_v, lod_c);
-	x_v[4] = vec4(r.x, r.y, norm_mip, 1.0);
+			eval_fn += """	x_v[1] = sample_hw(fine_tex1, in_uv, fine_size, rep_u, rep_v, lod_f, g_uv_x, g_uv_y, use_grad);
+	x_v[2] = sample_hw(coarse_tex0, in_uv, coarse_size, rep_u, rep_v, lod_c, g_uv_x, g_uv_y, use_grad);
+	x_v[3] = sample_hw(coarse_tex1, in_uv, coarse_size, rep_u, rep_v, lod_c, g_uv_x, g_uv_y, use_grad);
+	x_v[4] = vec4(r_in.x, r_in.y, norm_mip, 1.0);
 """
 		else:
-			eval_fn += """	x_v[1] = sample_hw(coarse_tex0, in_uv, coarse_size, rep_u, rep_v, lod_c);
-	x_v[2] = vec4(r.x, r.y, norm_mip, 1.0);
+			eval_fn += """	x_v[1] = sample_hw(coarse_tex0, in_uv, coarse_size, rep_u, rep_v, lod_c, g_uv_x, g_uv_y, use_grad);
+	x_v[2] = vec4(r_in.x, r_in.y, norm_mip, 1.0);
 """
 
 	eval_fn += """
@@ -251,9 +256,12 @@ static func generate_spatial_pbr_shader_code(
 	var core := _build_common_core(profile, path, wrap_u, wrap_v, use_uniform_weights)
 	var entry := """
 void fragment() {
-	vec2 d_uv_x = dFdx(UV) * source_size;
-	vec2 d_uv_y = dFdy(UV) * source_size;
+	vec2 uv_dx = dFdx(UV);
+	vec2 uv_dy = dFdy(UV);
+	vec2 d_uv_x = uv_dx * source_size;
+	vec2 d_uv_y = uv_dy * source_size;
 	float rho = max(length(d_uv_x), length(d_uv_y));
+	float rho_min = min(length(d_uv_x), length(d_uv_y));
 	float mip_est = log2(max(rho, 1.0));
 
 	float n_mip = 0.0;
@@ -264,14 +272,15 @@ void fragment() {
 	}
 
 	float active_mip = use_normalized_mip_override ? (n_mip * mip_max) : mip_est;
+	float active_mip_tw = use_normalized_mip_override ? active_mip : log2(max(max(rho_min, rho / 4.0), 1.0));
 	float tw = 0.0;
 	if (enable_tail_switch) {
-		if (tail_first_mip <= 0.0 || active_mip >= tail_first_mip) {
+		if (tail_first_mip <= 0.0 || active_mip_tw >= tail_first_mip) {
 			tw = 1.0;
 		} else if (enable_tail_crossfade) {
 			float hi = min(tail_first_mip, tail_blend_end);
 			float lo = min(tail_blend_start, hi);
-			float t = clamp((active_mip - lo) / max(hi - lo, 0.0001), 0.0, 1.0);
+			float t = clamp((active_mip_tw - lo) / max(hi - lo, 0.0001), 0.0, 1.0);
 			tw = t * t * (3.0 - 2.0 * t);
 		}
 	}
@@ -284,7 +293,8 @@ void fragment() {
 
 	if (tw < 1.0) {
 		float y[8];
-		eval_vnm1_raw(UV, n_mip, wrap_u_repeat, wrap_v_repeat, y, active_mip);
+		bool use_grad = (!use_normalized_mip_override) && enable_latent_lod && (active_mip >= 4.0);
+		eval_vnm1_raw(UV, n_mip, wrap_u_repeat, wrap_v_repeat, y, active_mip, uv_dx, uv_dy, use_grad);
 		alb = clamp(vec3(y[0], y[1], y[2]), vec3(0.0), vec3(1.0));
 		nrm = reconstruct_normal(y[3], y[4]);
 		rough = clamp(y[5], 0.0, 1.0);
@@ -350,7 +360,7 @@ void fragment() {
 	bool rep_v = (wflags & 2) != 0;
 
 	float y[8];
-	eval_vnm1_raw(cdata.xy, clamp(cdata.z, 0.0, 1.0), rep_u, rep_v, y, 0.0);
+	eval_vnm1_raw(cdata.xy, clamp(cdata.z, 0.0, 1.0), rep_u, rep_v, y, 0.0, vec2(0.0), vec2(0.0), false);
 
 	float out_val = 0.0;
 	if (!output_pbr_post) {
