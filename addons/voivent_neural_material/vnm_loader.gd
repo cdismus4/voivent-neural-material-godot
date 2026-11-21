@@ -401,10 +401,11 @@ static func _build_latent_textures(interleaved: PackedByteArray, width: int, hei
 	var texel_count := width * height
 	if channels == 4:
 		var img := Image.create_from_data(width, height, false, Image.FORMAT_RGBA8, interleaved)
+		img.generate_mipmaps()
 		result.append(ImageTexture.create_from_image(img))
 		return result
 
-	# 8ch: split cleanly into 2 RGBA8 textures (ch 0..3, ch 4..7) without mipmaps or sRGB
+	# 8ch: split cleanly into 2 RGBA8 textures (ch 0..3, ch 4..7) with linear mip chain for LOD prefiltering
 	var part0 := PackedByteArray()
 	var part1 := PackedByteArray()
 	part0.resize(texel_count * 4)
@@ -421,6 +422,10 @@ static func _build_latent_textures(interleaved: PackedByteArray, width: int, hei
 		part1[d + 2] = interleaved[s + 6]
 		part1[d + 3] = interleaved[s + 7]
 
-	result.append(ImageTexture.create_from_image(Image.create_from_data(width, height, false, Image.FORMAT_RGBA8, part0)))
-	result.append(ImageTexture.create_from_image(Image.create_from_data(width, height, false, Image.FORMAT_RGBA8, part1)))
+	var img0 := Image.create_from_data(width, height, false, Image.FORMAT_RGBA8, part0)
+	img0.generate_mipmaps()
+	var img1 := Image.create_from_data(width, height, false, Image.FORMAT_RGBA8, part1)
+	img1.generate_mipmaps()
+	result.append(ImageTexture.create_from_image(img0))
+	result.append(ImageTexture.create_from_image(img1))
 	return result

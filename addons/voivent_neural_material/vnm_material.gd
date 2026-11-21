@@ -56,6 +56,16 @@ func set_normalized_mip_override(enabled: bool, value: float = 0.0) -> void:
 func set_tail_switch_enabled(enabled: bool) -> void:
 	material.set_shader_parameter("enable_tail_switch", enabled)
 
+func set_tail_crossfade_enabled(enabled: bool) -> void:
+	material.set_shader_parameter("enable_tail_crossfade", enabled)
+
+func set_tail_blend_range(start_mip: float, end_mip: float) -> void:
+	material.set_shader_parameter("tail_blend_start", start_mip)
+	material.set_shader_parameter("tail_blend_end", maxf(start_mip, end_mip))
+
+func set_latent_lod_enabled(enabled: bool) -> void:
+	material.set_shader_parameter("enable_latent_lod", enabled)
+
 func set_lod_mip_enabled(enabled: bool) -> void:
 	material.set_shader_parameter("enable_lod_mip", enabled)
 
@@ -94,6 +104,10 @@ static func bind_package_parameters(mat: ShaderMaterial, pkg: _VnmPkg) -> void:
 	mat.set_shader_parameter("wrap_u_repeat", pkg.wrap_u == "repeat")
 	mat.set_shader_parameter("wrap_v_repeat", pkg.wrap_v == "repeat")
 	mat.set_shader_parameter("enable_lod_mip", pkg.has_explicit_mip_max)
+	mat.set_shader_parameter("enable_latent_lod", true)
 	mat.set_shader_parameter("enable_tail_switch", true)
+	mat.set_shader_parameter("enable_tail_crossfade", true)
+	mat.set_shader_parameter("tail_blend_start", 3.0)
+	mat.set_shader_parameter("tail_blend_end", 5.0)
 	mat.set_shader_parameter("use_normalized_mip_override", false)
 	mat.set_shader_parameter("normalized_mip_override", 0.0)

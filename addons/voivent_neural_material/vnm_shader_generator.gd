@@ -38,7 +38,7 @@ static func _build_common_core(profile: String, path: SamplingPath, wrap_u: Stri
 	var w3_start := b2_start + h2_v4
 	var b3_start := w3_start + out_dim * h2_v4
 
-	var tex_hint := "filter_nearest, repeat_disable" if path == SamplingPath.EXACT_BILINEAR else ("filter_linear, %s" % _wrap_hint(wrap_u, wrap_v))
+	var tex_hint := "filter_nearest, repeat_disable" if path == SamplingPath.EXACT_BILINEAR else ("filter_linear_mipmap, %s" % _wrap_hint(wrap_u, wrap_v))
 
 	var uniforms := """
 uniform sampler2D weights_tex : filter_nearest, repeat_disable;
@@ -64,7 +64,11 @@ uniform bool wrap_u_repeat = true;
 uniform bool wrap_v_repeat = true;
 uniform bool latent_is_float = false;
 uniform bool enable_lod_mip = false;
+uniform bool enable_latent_lod = true;
 uniform bool enable_tail_switch = true;
+uniform bool enable_tail_crossfade = true;
+uniform float tail_blend_start = 3.0;
+uniform float tail_blend_end = 5.0;
 uniform bool use_normalized_mip_override = false;
 uniform float normalized_mip_override = 0.0;
 """ % [_wrap_hint(wrap_u, wrap_v), _wrap_hint(wrap_u, wrap_v)]
@@ -104,10 +108,10 @@ vec4 sample_exact(sampler2D t, vec2 uv_eff, ivec2 sz, bool rep_u, bool rep_v) {
 	return mix(mix(f00, f10, fx), mix(f01, f11, fx), fy);
 }
 
-vec4 sample_hw(sampler2D t, vec2 raw_uv, ivec2 sz, bool rep_u, bool rep_v) {
+vec4 sample_hw(sampler2D t, vec2 raw_uv, ivec2 sz, bool rep_u, bool rep_v, float lod) {
 	float hu = rep_u ? raw_uv.x : clamp(raw_uv.x, 0.5 / float(sz.x), 1.0 - 0.5 / float(sz.x));
 	float hv = rep_v ? raw_uv.y : clamp(raw_uv.y, 0.5 / float(sz.y), 1.0 - 0.5 / float(sz.y));
-	return textureLod(t, vec2(hu, hv), 0.0) * 2.0 - 1.0;
+	return textureLod(t, vec2(hu, hv), lod) * 2.0 - 1.0;
 }
 
 vec3 reconstruct_normal(float raw_nx, float raw_ny) {
@@ -125,7 +129,7 @@ vec3 reconstruct_normal(float raw_nx, float raw_ny) {
 """
 
 	var eval_fn := """
-void eval_vnm1_raw(vec2 in_uv, float norm_mip, bool rep_u, bool rep_v, out float raw_out[8]) {
+void eval_vnm1_raw(vec2 in_uv, float norm_mip, bool rep_u, bool rep_v, out float raw_out[8], float lat_mip) {
 	float u_eff = rep_u ? fract(in_uv.x) : clamp(in_uv.x, 0.0, 1.0);
 	float v_eff = rep_v ? fract(in_uv.y) : clamp(in_uv.y, 0.0, 1.0);
 	vec2 uv_eff = vec2(u_eff, v_eff);
@@ -150,15 +154,19 @@ void eval_vnm1_raw(vec2 in_uv, float norm_mip, bool rep_u, bool rep_v, out float
 	x_v[2] = vec4(r.x, r.y, norm_mip, 1.0);
 """
 	else:
-		eval_fn += "	x_v[0] = sample_hw(fine_tex0, in_uv, fine_size, rep_u, rep_v);\n"
+		# Prefilter latents via mip chain matching source pixel footprint (grid is source / 2^k)
+		eval_fn += "	float eff_lat = enable_latent_lod ? lat_mip : 0.0;\n"
+		eval_fn += "	float lod_f = clamp(eff_lat - log2(max(source_size.x / float(fine_size.x), 1.0)), 0.0, 10.0);\n"
+		eval_fn += "	float lod_c = clamp(eff_lat - log2(max(source_size.x / float(coarse_size.x), 1.0)), 0.0, 10.0);\n"
+		eval_fn += "	x_v[0] = sample_hw(fine_tex0, in_uv, fine_size, rep_u, rep_v, lod_f);\n"
 		if ch == 8:
-			eval_fn += """	x_v[1] = sample_hw(fine_tex1, in_uv, fine_size, rep_u, rep_v);
-	x_v[2] = sample_hw(coarse_tex0, in_uv, coarse_size, rep_u, rep_v);
-	x_v[3] = sample_hw(coarse_tex1, in_uv, coarse_size, rep_u, rep_v);
+			eval_fn += """	x_v[1] = sample_hw(fine_tex1, in_uv, fine_size, rep_u, rep_v, lod_f);
+	x_v[2] = sample_hw(coarse_tex0, in_uv, coarse_size, rep_u, rep_v, lod_c);
+	x_v[3] = sample_hw(coarse_tex1, in_uv, coarse_size, rep_u, rep_v, lod_c);
 	x_v[4] = vec4(r.x, r.y, norm_mip, 1.0);
 """
 		else:
-			eval_fn += """	x_v[1] = sample_hw(coarse_tex0, in_uv, coarse_size, rep_u, rep_v);
+			eval_fn += """	x_v[1] = sample_hw(coarse_tex0, in_uv, coarse_size, rep_u, rep_v, lod_c);
 	x_v[2] = vec4(r.x, r.y, norm_mip, 1.0);
 """
 
@@ -243,7 +251,34 @@ void fragment() {
 	}
 
 	float active_mip = use_normalized_mip_override ? (n_mip * mip_max) : mip_est;
-	if (enable_tail_switch && active_mip >= tail_first_mip) {
+	float tw = 0.0;
+	if (enable_tail_switch) {
+		if (tail_first_mip <= 0.0 || active_mip >= tail_first_mip) {
+			tw = 1.0;
+		} else if (enable_tail_crossfade) {
+			float hi = min(tail_first_mip, tail_blend_end);
+			float lo = min(tail_blend_start, hi);
+			float t = clamp((active_mip - lo) / max(hi - lo, 0.0001), 0.0, 1.0);
+			tw = t * t * (3.0 - 2.0 * t);
+		}
+	}
+
+	vec3 alb = vec3(0.0);
+	vec3 nrm = vec3(0.0, 0.0, 1.0);
+	float rough = 1.0;
+	float metal = 0.0;
+	float ao_v = 1.0;
+
+	if (tw < 1.0) {
+		float y[8];
+		eval_vnm1_raw(UV, n_mip, wrap_u_repeat, wrap_v_repeat, y, active_mip);
+		alb = clamp(vec3(y[0], y[1], y[2]), vec3(0.0), vec3(1.0));
+		nrm = reconstruct_normal(y[3], y[4]);
+		rough = clamp(y[5], 0.0, 1.0);
+		metal = clamp(y[6], 0.0, 1.0);
+		ao_v = clamp(y[7], 0.0, 1.0);
+	}
+	if (tw > 0.0) {
 		vec2 t_sz = vec2(textureSize(tail_tex0, 0));
 		vec2 uv_tail = vec2(
 			wrap_u_repeat ? UV.x : clamp(UV.x, 0.5 / t_sz.x, 1.0 - 0.5 / t_sz.x),
@@ -251,20 +286,27 @@ void fragment() {
 		);
 		vec4 t0 = textureLod(tail_tex0, uv_tail, 0.0);
 		vec4 t1 = textureLod(tail_tex1, uv_tail, 0.0);
-		ALBEDO = t0.rgb;
-		NORMAL_MAP = reconstruct_normal(t0.a * 2.0 - 1.0, t1.r * 2.0 - 1.0) * 0.5 + 0.5;
-		ROUGHNESS = t1.g;
-		METALLIC = t1.b;
-		AO = t1.a;
-	} else {
-		float y[8];
-		eval_vnm1_raw(UV, n_mip, wrap_u_repeat, wrap_v_repeat, y);
-		ALBEDO = clamp(vec3(y[0], y[1], y[2]), vec3(0.0), vec3(1.0));
-		NORMAL_MAP = reconstruct_normal(y[3], y[4]) * 0.5 + 0.5;
-		ROUGHNESS = clamp(y[5], 0.0, 1.0);
-		METALLIC = clamp(y[6], 0.0, 1.0);
-		AO = clamp(y[7], 0.0, 1.0);
+		vec3 nrm_t = reconstruct_normal(t0.a * 2.0 - 1.0, t1.r * 2.0 - 1.0);
+		if (tw >= 1.0) {
+			alb = t0.rgb;
+			nrm = nrm_t;
+			rough = t1.g;
+			metal = t1.b;
+			ao_v = t1.a;
+		} else {
+			alb = mix(alb, t0.rgb, tw);
+			nrm = normalize(mix(nrm, nrm_t, tw));
+			rough = mix(rough, t1.g, tw);
+			metal = mix(metal, t1.b, tw);
+			ao_v = mix(ao_v, t1.a, tw);
+		}
 	}
+
+	ALBEDO = alb;
+	NORMAL_MAP = nrm * 0.5 + 0.5;
+	ROUGHNESS = rough;
+	METALLIC = metal;
+	AO = ao_v;
 }
 """
 	return "shader_type spatial;\n" + core + entry
@@ -294,7 +336,7 @@ void fragment() {
 	bool rep_v = (wflags & 2) != 0;
 
 	float y[8];
-	eval_vnm1_raw(cdata.xy, clamp(cdata.z, 0.0, 1.0), rep_u, rep_v, y);
+	eval_vnm1_raw(cdata.xy, clamp(cdata.z, 0.0, 1.0), rep_u, rep_v, y, 0.0);
 
 	float out_val = 0.0;
 	if (!output_pbr_post) {

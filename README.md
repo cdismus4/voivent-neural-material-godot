@@ -17,7 +17,7 @@ Runtime loader and GPU fragment-shader decoder addon for **Voivent Neural Materi
   - `HARDWARE_BILINEAR` (Path A, default runtime): Hardware `textureLod` filtering, passing `SPEC §7.2` (`<= 1e-4` lattice, `<= 2.0e-4` arbitrary UV).
   - `EXACT_BILINEAR` (Path B, strict conformance): `texelFetch` x 4 manual `SPEC §6.1` bilinear interpolation with exact `repeat` / `clamp` wrapping (`<= 1e-4` gate).
 - **Runtime `.vnm` folder and `.zip` loader**: Reads 4-file VNM1 bundles (`manifest.json`, `weights.bin`, `level-0.bin`, `tail.bin`) with strict SHA-256, header magic/version, subheader dimension, and reserved-byte validation without going through editor image import.
-- **Progressive `tail` transition & `normalizedMip` override**: Includes `use_normalized_mip_override` / `normalized_mip_override` for golden verification and distance-based switching to split `tail` textures.
+- **Progressive `tail` crossfade & latent LOD filtering**: Includes distance-driven latent mip prefiltering (`enable_latent_lod`) and smooth crossfading into `tail_tex0`/`tail_tex1` across `tail_blend_start..tail_blend_end` (`3.0..5.0` by default) to suppress far-distance moiré, plus `use_normalized_mip_override` / `normalized_mip_override` for golden verification.
 
 ## Installation
 
@@ -89,9 +89,10 @@ Open `demo/sample_scene.tscn` or pass any `.vnm` directory or `.zip` bundle via 
 godot --path . res://demo/sample_scene.tscn -- --vnm=/path/to/marble.vnm
 ```
 
-## Known Limitations (VNM1 v1)
+## Known Limitations & Color Space (VNM1 v1)
 
-- **No intermediate mipmaps in v1**: VNM1 v1 assets encode mip 0 (`level-0.bin`) plus a `16x16` `tail.bin` without intermediate mip levels (mip 1..6). High-frequency woven/periodic surfaces (e.g. denim or fine fabric) will exhibit minification moire at steep distances compared to mipmapped PBR textures.
+- **Linear BaseColor output**: Per `SPEC §3`/`§6.4`, decoded `ALBEDO` is in **linear-sRGB** space (`baseColorSpace: "linear-srgb"`). Normal Godot-imported `StandardMaterial3D` albedo textures are also converted from sRGB to linear automatically; if you load reference PNGs manually at runtime via `Image.load_from_file()`, convert the basecolor map with `srgb_to_linear` before comparing brightness against VNM1.
+- **No neural intermediate mipmaps in v1**: VNM1 v1 assets store mip 0 (`level-0.bin`) and a `16x16` `tail.bin`. `HARDWARE_BILINEAR` mitigates far-distance minification aliasing via latent mipmap prefiltering (`enable_latent_lod`) and smooth tail crossfading (`enable_tail_crossfade`, default mips `3.0..5.0`), both toggleable per `VnmMaterial`.
 - **Channel scope**: 8 PBR channels (`baseColor` RGB, tangent `normal` XY with `+Y` up, `roughness`, `metalness`, `ao`); alpha cutout, emissive, and height maps are outside v1.
 
 ## License
