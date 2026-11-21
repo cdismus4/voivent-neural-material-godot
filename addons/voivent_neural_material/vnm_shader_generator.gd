@@ -109,8 +109,11 @@ vec4 sample_exact(sampler2D t, vec2 uv_eff, ivec2 sz, bool rep_u, bool rep_v) {
 }
 
 vec4 sample_hw(sampler2D t, vec2 raw_uv, ivec2 sz, bool rep_u, bool rep_v, float lod) {
-	float hu = rep_u ? raw_uv.x : clamp(raw_uv.x, 0.5 / float(sz.x), 1.0 - 0.5 / float(sz.x));
-	float hv = rep_v ? raw_uv.y : clamp(raw_uv.y, 0.5 / float(sz.y), 1.0 - 0.5 / float(sz.y));
+	float lod_scale = exp2(max(lod, 0.0));
+	float mu = min(0.5 * lod_scale / max(float(sz.x), 1.0), 0.5);
+	float mv = min(0.5 * lod_scale / max(float(sz.y), 1.0), 0.5);
+	float hu = rep_u ? raw_uv.x : clamp(raw_uv.x, mu, 1.0 - mu);
+	float hv = rep_v ? raw_uv.y : clamp(raw_uv.y, mv, 1.0 - mv);
 	return textureLod(t, vec2(hu, hv), lod) * 2.0 - 1.0;
 }
 
@@ -156,8 +159,10 @@ void eval_vnm1_raw(vec2 in_uv, float norm_mip, bool rep_u, bool rep_v, out float
 	else:
 		# Prefilter latents via mip chain matching source pixel footprint (grid is source / 2^k)
 		eval_fn += "	float eff_lat = enable_latent_lod ? lat_mip : 0.0;\n"
-		eval_fn += "	float lod_f = clamp(eff_lat - log2(max(source_size.x / float(fine_size.x), 1.0)), 0.0, 10.0);\n"
-		eval_fn += "	float lod_c = clamp(eff_lat - log2(max(source_size.x / float(coarse_size.x), 1.0)), 0.0, 10.0);\n"
+		eval_fn += "	float ratio_f = max(source_size.x / max(float(fine_size.x), 1.0), source_size.y / max(float(fine_size.y), 1.0));\n"
+		eval_fn += "	float ratio_c = max(source_size.x / max(float(coarse_size.x), 1.0), source_size.y / max(float(coarse_size.y), 1.0));\n"
+		eval_fn += "	float lod_f = clamp(eff_lat - log2(max(ratio_f, 1.0)), 0.0, 10.0);\n"
+		eval_fn += "	float lod_c = clamp(eff_lat - log2(max(ratio_c, 1.0)), 0.0, 10.0);\n"
 		eval_fn += "	x_v[0] = sample_hw(fine_tex0, in_uv, fine_size, rep_u, rep_v, lod_f);\n"
 		if ch == 8:
 			eval_fn += """	x_v[1] = sample_hw(fine_tex1, in_uv, fine_size, rep_u, rep_v, lod_f);
@@ -309,7 +314,7 @@ void fragment() {
 	AO = ao_v;
 }
 """
-	return "shader_type spatial;\n" + core + entry
+	return "shader_type spatial;\nrender_mode diffuse_burley, specular_schlick_ggx;\n" + core + entry
 
 static func generate_verification_shader_code(
 	profile: String,

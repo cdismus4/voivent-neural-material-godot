@@ -85,6 +85,11 @@ VNM_DEMO_ASSETS_DIR=/path/to/vnm-demo-assets \
 ```
 Outputs JSON report to `tests/reports/godot_p2_cost_<rendering_method>.json`.
 
+### 5. Non-Square LOD & Clamp Margin Regression (`O8`)
+```bash
+godot --path . res://tests/test_o8_lod_and_clamp.tscn --rendering-driver metal --resolution 128x128 --quit-after 300
+```
+
 ## Sample Scene
 
 Open `demo/sample_scene.tscn` or pass any `.vnm` directory or `.zip` bundle via CLI (`--vnm=...`) or `VNM_SAMPLE_PATH`:

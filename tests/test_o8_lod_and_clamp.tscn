@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://tests/test_o8_lod_and_clamp.gd" id="1_o8"]
+
+[node name="TestO8LodAndClamp" type="Node"]
+script = ExtResource("1_o8")
