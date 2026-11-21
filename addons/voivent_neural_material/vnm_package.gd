@@ -23,6 +23,7 @@ var total_weights: int = 1112
 
 var weights_texture: ImageTexture = null
 var weights_tex_size: Vector2i = Vector2i(32, 16)
+var weights_vec4: PackedVector4Array = PackedVector4Array()
 var fine_textures: Array[ImageTexture] = []
 var coarse_textures: Array[ImageTexture] = []
 var tail_textures: Array[ImageTexture] = []

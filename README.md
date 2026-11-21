@@ -15,7 +15,7 @@ Runtime loader and GPU fragment-shader decoder addon for **Voivent Neural Materi
 
 - **Zero GDExtension required**: Pure GDScript + Godot spatial shading language (`addons/voivent_neural_material/`).
 - **All 5 VNM1 profiles supported** from a single parameterized template: `small` (4ch), `standard` (4ch), `quality` (4ch), `standard8` (8ch), and `quality8` (8ch).
-- **Weights as `RGBA32F` texture (`texelFetch`)**: Bypasses uniform vector size limits cleanly across Forward+, Mobile, and Compatibility.
+- **Weights as `uniform vec4[]` UBO array (default, with `RGBA32F` texture fallback)**: Binds MLP weights directly as a `PackedVector4Array` (`<= 498` `vec4`, ~7.8 KB for `quality8`) for mobile GPU speed while keeping exact FP32 conformance (`use_uniform_weights = false` selects the legacy `weights_tex` path).
 - **Two sampling paths**:
   - `HARDWARE_BILINEAR` (Path A, default runtime): Hardware `textureLod` filtering, passing `SPEC §7.2` (`<= 1e-4` lattice, `<= 2.0e-4` arbitrary UV).
   - `EXACT_BILINEAR` (Path B, strict conformance): `texelFetch` x 4 manual `SPEC §6.1` bilinear interpolation with exact `repeat` / `clamp` wrapping (`<= 1e-4` gate).

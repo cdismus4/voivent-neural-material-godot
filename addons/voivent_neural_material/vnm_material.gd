@@ -13,21 +13,28 @@ static var _shader_cache: Dictionary = {}
 var package: _VnmPkg
 var material: ShaderMaterial
 var sampling_path: _VnmGen.SamplingPath
+var use_uniform_weights: bool = true
 
-func _init(p_package: _VnmPkg, p_path: _VnmGen.SamplingPath = _VnmGen.SamplingPath.HARDWARE_BILINEAR) -> void:
+func _init(
+	p_package: _VnmPkg,
+	p_path: _VnmGen.SamplingPath = _VnmGen.SamplingPath.HARDWARE_BILINEAR,
+	p_use_uniform_weights: bool = true,
+) -> void:
 	package = p_package
 	sampling_path = p_path
+	use_uniform_weights = p_use_uniform_weights
 	material = _build_material()
 
 static func load_from_path(
 	vnm_path: String,
 	p_path: _VnmGen.SamplingPath = _VnmGen.SamplingPath.HARDWARE_BILINEAR,
+	p_use_uniform_weights: bool = true,
 ) -> Dictionary:
 	var loaded := _VnmLdr.load_package(vnm_path)
 	if not loaded.get("ok", false):
 		return loaded
 	var pkg: _VnmPkg = loaded["package"]
-	var vnm_mat := new(pkg, p_path)
+	var vnm_mat := new(pkg, p_path, p_use_uniform_weights)
 	return {"ok": true, "error": "", "vnm_material": vnm_mat, "package": pkg}
 
 static func apply_to_mesh(
@@ -35,8 +42,9 @@ static func apply_to_mesh(
 	vnm_path: String,
 	p_path: _VnmGen.SamplingPath = _VnmGen.SamplingPath.HARDWARE_BILINEAR,
 	surface_index: int = -1,
+	p_use_uniform_weights: bool = true,
 ) -> Dictionary:
-	var res := load_from_path(vnm_path, p_path)
+	var res := load_from_path(vnm_path, p_path, p_use_uniform_weights)
 	if not res.get("ok", false):
 		return res
 	var vnm_mat: Variant = res["vnm_material"]
@@ -70,7 +78,7 @@ func set_lod_mip_enabled(enabled: bool) -> void:
 	material.set_shader_parameter("enable_lod_mip", enabled)
 
 func _build_material() -> ShaderMaterial:
-	var key := "%s:%d:%s:%s" % [package.profile, int(sampling_path), package.wrap_u, package.wrap_v]
+	var key := "%s:%d:%s:%s:%d" % [package.profile, int(sampling_path), package.wrap_u, package.wrap_v, 1 if use_uniform_weights else 0]
 	var shader: Shader = _shader_cache.get(key, null)
 	if shader == null:
 		shader = Shader.new()
@@ -79,16 +87,20 @@ func _build_material() -> ShaderMaterial:
 			sampling_path,
 			package.wrap_u,
 			package.wrap_v,
+			use_uniform_weights,
 		)
 		_shader_cache[key] = shader
 
 	var mat := ShaderMaterial.new()
 	mat.shader = shader
-	bind_package_parameters(mat, package)
+	bind_package_parameters(mat, package, use_uniform_weights)
 	return mat
 
-static func bind_package_parameters(mat: ShaderMaterial, pkg: _VnmPkg) -> void:
-	mat.set_shader_parameter("weights_tex", pkg.weights_texture)
+static func bind_package_parameters(mat: ShaderMaterial, pkg: _VnmPkg, p_use_uniform_weights: bool = true) -> void:
+	if p_use_uniform_weights:
+		mat.set_shader_parameter("weights", pkg.weights_vec4)
+	else:
+		mat.set_shader_parameter("weights_tex", pkg.weights_texture)
 	mat.set_shader_parameter("fine_tex0", pkg.fine_textures[0])
 	mat.set_shader_parameter("coarse_tex0", pkg.coarse_textures[0])
 	if pkg.latent_channels == 8:

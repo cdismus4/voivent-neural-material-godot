@@ -16,7 +16,7 @@ enum SamplingPath {
 static func _wrap_hint(wrap_u: String, wrap_v: String) -> String:
 	return "repeat_disable" if (wrap_u == "clamp" and wrap_v == "clamp") else "repeat_enable"
 
-static func _build_common_core(profile: String, path: SamplingPath, wrap_u: String, wrap_v: String) -> String:
+static func _build_common_core(profile: String, path: SamplingPath, wrap_u: String, wrap_v: String, use_uniform_weights: bool = true) -> String:
 	if not _VnmLdr.PROFILE_SPECS.has(profile):
 		push_error("Unsupported VNM1 profile: %s" % profile)
 		return ""
@@ -26,6 +26,7 @@ static func _build_common_core(profile: String, path: SamplingPath, wrap_u: Stri
 	var h2: int = int(spec["h2"])
 	var out_dim: int = int(spec["output_dim"])
 	var ch: int = int(spec["latent_ch"])
+	var vec4_count := (int(spec["total_weights"]) + 3) / 4
 
 	var in_v4 := in_dim / 4
 	var h1_v4 := h1 / 4
@@ -40,11 +41,11 @@ static func _build_common_core(profile: String, path: SamplingPath, wrap_u: Stri
 
 	var tex_hint := "filter_nearest, repeat_disable" if path == SamplingPath.EXACT_BILINEAR else ("filter_linear_mipmap, %s" % _wrap_hint(wrap_u, wrap_v))
 
+	var weight_uniform := ("uniform vec4 weights[%d];\n" % vec4_count) if use_uniform_weights else "uniform sampler2D weights_tex : filter_nearest, repeat_disable;\n"
 	var uniforms := """
-uniform sampler2D weights_tex : filter_nearest, repeat_disable;
-uniform sampler2D fine_tex0 : %s;
+%suniform sampler2D fine_tex0 : %s;
 uniform sampler2D coarse_tex0 : %s;
-""" % [tex_hint, tex_hint]
+""" % [weight_uniform, tex_hint, tex_hint]
 
 	if ch == 8:
 		uniforms += """
@@ -73,10 +74,16 @@ uniform bool use_normalized_mip_override = false;
 uniform float normalized_mip_override = 0.0;
 """ % [_wrap_hint(wrap_u, wrap_v), _wrap_hint(wrap_u, wrap_v)]
 
-	var helpers := """
+	var fetch_fn := """
+vec4 fetch_w(int idx) {
+	return weights[idx];
+}
+""" if use_uniform_weights else """
 vec4 fetch_w(int idx) {
 	return texelFetch(weights_tex, ivec2(idx & 31, idx >> 5), 0);
 }
+"""
+	var helpers := fetch_fn + """
 
 int wrap_idx(int c, int sz, bool rep) {
 	if (rep) {
@@ -239,8 +246,9 @@ static func generate_spatial_pbr_shader_code(
 	path: SamplingPath = SamplingPath.HARDWARE_BILINEAR,
 	wrap_u: String = "repeat",
 	wrap_v: String = "repeat",
+	use_uniform_weights: bool = true,
 ) -> String:
-	var core := _build_common_core(profile, path, wrap_u, wrap_v)
+	var core := _build_common_core(profile, path, wrap_u, wrap_v, use_uniform_weights)
 	var entry := """
 void fragment() {
 	vec2 d_uv_x = dFdx(UV) * source_size;
@@ -322,8 +330,9 @@ static func generate_verification_shader_code(
 	wrap_u: String = "repeat",
 	wrap_v: String = "repeat",
 	case_count: int = 286,
+	use_uniform_weights: bool = true,
 ) -> String:
-	var core := _build_common_core(profile, path, wrap_u, wrap_v)
+	var core := _build_common_core(profile, path, wrap_u, wrap_v, use_uniform_weights)
 	var verify_uniforms_and_frag := """
 uniform sampler2D cases_tex : filter_nearest, repeat_disable;
 uniform bool output_pbr_post = false;

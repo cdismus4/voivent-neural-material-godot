@@ -7,6 +7,27 @@ const GATE_STRICT := 1.0e-4
 const GATE_HW_ARBITRARY := 2.0e-4
 const PROFILES := ["standard", "standard8", "quality", "quality8"]
 
+func _pack_weights_vec4(profile: String, w: Dictionary) -> PackedVector4Array:
+	var f := PackedFloat32Array()
+	for key in ["w1", "b1", "w2", "b2", "w3", "b3"]:
+		var arr: Array = w[key]
+		for x in arr:
+			f.append(float(x))
+	var expected := int(_VnmLdr.PROFILE_SPECS[profile]["total_weights"])
+	assert(f.size() == expected)
+	var vec4_count := (expected + 3) / 4
+	var padded := PackedFloat32Array()
+	padded.resize(vec4_count * 4)
+	padded.fill(0.0)
+	for i in range(expected):
+		padded[i] = f[i]
+	var out := PackedVector4Array()
+	out.resize(vec4_count)
+	for vi in range(vec4_count):
+		var bi := vi * 4
+		out[vi] = Vector4(padded[bi], padded[bi + 1], padded[bi + 2], padded[bi + 3])
+	return out
+
 func _pack_weights_tex(profile: String, w: Dictionary) -> ImageTexture:
 	var f := PackedFloat32Array()
 	for key in ["w1", "b1", "w2", "b2", "w3", "b3"]:
@@ -74,6 +95,8 @@ func _run_shader_pass(
 	profile: String,
 	path: _VnmGen.SamplingPath,
 	weights_tex: ImageTexture,
+	weights_vec4: PackedVector4Array,
+	use_uniform_weights: bool,
 	fine_textures: Array[ImageTexture],
 	coarse_textures: Array[ImageTexture],
 	fine_sz: Vector2i,
@@ -97,10 +120,13 @@ func _run_shader_pass(
 	sv.add_child(cam)
 
 	var shader := Shader.new()
-	shader.code = _VnmGen.generate_verification_shader_code(profile, path, "repeat", "repeat", case_count)
+	shader.code = _VnmGen.generate_verification_shader_code(profile, path, "repeat", "repeat", case_count, use_uniform_weights)
 	var mat := ShaderMaterial.new()
 	mat.shader = shader
-	mat.set_shader_parameter("weights_tex", weights_tex)
+	if use_uniform_weights:
+		mat.set_shader_parameter("weights", weights_vec4)
+	else:
+		mat.set_shader_parameter("weights_tex", weights_tex)
 	mat.set_shader_parameter("fine_tex0", fine_textures[0])
 	mat.set_shader_parameter("coarse_tex0", coarse_textures[0])
 	if fine_textures.size() > 1:
@@ -199,9 +225,10 @@ func _ready() -> void:
 	var golden_dir := OS.get_environment("VNM_GOLDEN_DIR")
 	if golden_dir.is_empty():
 		golden_dir = ProjectSettings.globalize_path("res://../voivent-neural-material/src/__tests__/fixtures")
+	var use_uniform_weights := OS.get_environment("VNM_G4_TEXTURE_WEIGHTS") != "1"
 
 	var device_name := "%s (%s)" % [RenderingServer.get_video_adapter_name(), RenderingServer.get_video_adapter_api_version()]
-	print("[G-4] Running 4-profile x 286-case SPEC §7 harness on: ", device_name)
+	print("[G-4] Running 4-profile x 286-case SPEC §7 harness (uniform_weights=", use_uniform_weights, ") on: ", device_name)
 
 	var all_passed := true
 	var profile_reports := {}
@@ -216,7 +243,8 @@ func _ready() -> void:
 		var cases: Array = parsed["cases"]
 		var case_count := cases.size()
 
-		var weights_tex := _pack_weights_tex(profile, parsed["weights"])
+		var weights_tex := _pack_weights_tex(profile, parsed["weights"]) if not use_uniform_weights else null
+		var weights_vec4 := _pack_weights_vec4(profile, parsed["weights"]) if use_uniform_weights else PackedVector4Array()
 		var fine_float_tex := _build_float_latent_textures(parsed["fine_float"], fine_sz.x, fine_sz.y, ch)
 		var coarse_float_tex := _build_float_latent_textures(parsed["coarse_float"], coarse_sz.x, coarse_sz.y, ch)
 
@@ -238,19 +266,19 @@ func _ready() -> void:
 		var cases_tex := ImageTexture.create_from_image(Image.create_from_data(case_count, 1, false, Image.FORMAT_RGBAF, c_f32.to_byte_array()))
 
 		# 1. Path B (EXACT_BILINEAR) - float grids (SPEC §7.1 gate <= 1e-4)
-		var pb_float_raw := await _run_shader_pass(profile, _VnmGen.SamplingPath.EXACT_BILINEAR, weights_tex, fine_float_tex, coarse_float_tex, fine_sz, coarse_sz, cases_tex, case_count, true, false)
-		var pb_float_pbr := await _run_shader_pass(profile, _VnmGen.SamplingPath.EXACT_BILINEAR, weights_tex, fine_float_tex, coarse_float_tex, fine_sz, coarse_sz, cases_tex, case_count, true, true)
+		var pb_float_raw := await _run_shader_pass(profile, _VnmGen.SamplingPath.EXACT_BILINEAR, weights_tex, weights_vec4, use_uniform_weights, fine_float_tex, coarse_float_tex, fine_sz, coarse_sz, cases_tex, case_count, true, false)
+		var pb_float_pbr := await _run_shader_pass(profile, _VnmGen.SamplingPath.EXACT_BILINEAR, weights_tex, weights_vec4, use_uniform_weights, fine_float_tex, coarse_float_tex, fine_sz, coarse_sz, cases_tex, case_count, true, true)
 		var pb_float_stats := _eval_raw_errors(pb_float_raw, cases, "expected_raw_float", fine_sz, coarse_sz)
 		var pb_float_pbr_err := _eval_pbr_errors(pb_float_pbr, cases, "expected_pbr_float")
 		var pb_float_ok := float(pb_float_stats["max_abs_err"]) <= GATE_STRICT and pb_float_pbr_err <= GATE_STRICT
 
 		# 2. Path B (EXACT_BILINEAR) - u8 grids (SPEC §7.1 gate <= 1e-4)
-		var pb_u8_raw := await _run_shader_pass(profile, _VnmGen.SamplingPath.EXACT_BILINEAR, weights_tex, fine_u8_tex, coarse_u8_tex, fine_sz, coarse_sz, cases_tex, case_count, false, false)
+		var pb_u8_raw := await _run_shader_pass(profile, _VnmGen.SamplingPath.EXACT_BILINEAR, weights_tex, weights_vec4, use_uniform_weights, fine_u8_tex, coarse_u8_tex, fine_sz, coarse_sz, cases_tex, case_count, false, false)
 		var pb_u8_stats := _eval_raw_errors(pb_u8_raw, cases, "expected_raw_u8", fine_sz, coarse_sz)
 		var pb_u8_ok := float(pb_u8_stats["max_abs_err"]) <= GATE_STRICT
 
 		# 3. Path A (HARDWARE_BILINEAR) - u8 grids (SPEC §7.2 lattice <= 1e-4, arbitrary <= 2.0e-4)
-		var pa_u8_raw := await _run_shader_pass(profile, _VnmGen.SamplingPath.HARDWARE_BILINEAR, weights_tex, fine_u8_tex, coarse_u8_tex, fine_sz, coarse_sz, cases_tex, case_count, false, false)
+		var pa_u8_raw := await _run_shader_pass(profile, _VnmGen.SamplingPath.HARDWARE_BILINEAR, weights_tex, weights_vec4, use_uniform_weights, fine_u8_tex, coarse_u8_tex, fine_sz, coarse_sz, cases_tex, case_count, false, false)
 		var pa_u8_stats := _eval_raw_errors(pa_u8_raw, cases, "expected_raw_u8", fine_sz, coarse_sz)
 		var pa_ok := float(pa_u8_stats["max_lattice_err"]) <= GATE_STRICT and float(pa_u8_stats["max_arbitrary_err"]) <= GATE_HW_ARBITRARY
 
@@ -263,7 +291,7 @@ func _ready() -> void:
 			shuf[bi] = shuf[j]
 			shuf[j] = tmp
 		var shuf_fine_tex := _build_u8_latent_textures(shuf, fine_sz.x, fine_sz.y, ch)
-		var neg_raw := await _run_shader_pass(profile, _VnmGen.SamplingPath.EXACT_BILINEAR, weights_tex, shuf_fine_tex, coarse_u8_tex, fine_sz, coarse_sz, cases_tex, case_count, false, false)
+		var neg_raw := await _run_shader_pass(profile, _VnmGen.SamplingPath.EXACT_BILINEAR, weights_tex, weights_vec4, use_uniform_weights, shuf_fine_tex, coarse_u8_tex, fine_sz, coarse_sz, cases_tex, case_count, false, false)
 		var neg_stats := _eval_raw_errors(neg_raw, cases, "expected_raw_u8", fine_sz, coarse_sz)
 		var neg_rejected := float(neg_stats["max_abs_err"]) > GATE_STRICT
 
@@ -302,7 +330,8 @@ func _ready() -> void:
 		"all_passed": all_passed,
 		"profiles": profile_reports,
 	}
-	var out_path := ProjectSettings.globalize_path("res://tests/reports/godot_g4_report.json")
+	var out_name := "godot_g4_report.json" if use_uniform_weights else "godot_g4_report_texture_weights.json"
+	var out_path := ProjectSettings.globalize_path("res://tests/reports/%s" % out_name)
 	var fa := FileAccess.open(out_path, FileAccess.WRITE)
 	fa.store_string(JSON.stringify(report, "  "))
 	fa.close()

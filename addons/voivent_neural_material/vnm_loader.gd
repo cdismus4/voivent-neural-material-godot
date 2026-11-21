@@ -286,6 +286,11 @@ static func load_package(path: String) -> Dictionary:
 	padded_f32.fill(0.0)
 	for wi in range(total_weights):
 		padded_f32[wi] = f32_weights[wi]
+	var weights_vec4 := PackedVector4Array()
+	weights_vec4.resize(vec4_count)
+	for vi in range(vec4_count):
+		var bi := vi * 4
+		weights_vec4[vi] = Vector4(padded_f32[bi], padded_f32[bi + 1], padded_f32[bi + 2], padded_f32[bi + 3])
 	var weights_img := Image.create_from_data(w_tex_w, w_tex_h, false, Image.FORMAT_RGBAF, padded_f32.to_byte_array())
 	var weights_tex := ImageTexture.create_from_image(weights_img)
 
@@ -387,6 +392,7 @@ static func load_package(path: String) -> Dictionary:
 	pkg.total_weights = total_weights
 	pkg.weights_texture = weights_tex
 	pkg.weights_tex_size = Vector2i(w_tex_w, w_tex_h)
+	pkg.weights_vec4 = weights_vec4
 	pkg.fine_textures = fine_textures
 	pkg.coarse_textures = coarse_textures
 	pkg.tail_textures = tail_textures
